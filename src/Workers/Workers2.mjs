@@ -21,26 +21,7 @@ export class Workers {
     }
 
 
-    updateQueue( { thread, chunks } ) {
-        const encoder = new TextEncoder()
 
-        const transformedChunks = chunks
-            .map( chunk => {
-                const str = JSON.stringify( chunk )
-                const uint8Array = encoder.encode( str )
-                const buffer = uint8Array.buffer
-                console.log( chunk )
-                console.log( '---' )
-                const result = {
-                    thread,
-                    // chunk
-                    buffer
-                }
-
-                return result
-            } )
-        return true
-    }
 
 
     #addQueue() {

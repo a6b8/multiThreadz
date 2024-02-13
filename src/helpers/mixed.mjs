@@ -14,6 +14,13 @@ function indexToXY( { index, cols } ) {
 }
 
 
+function objectToBuffer( { obj } ) {
+    const str = JSON.stringify( obj )
+    const buffer = textToBuffer( str )
+    return buffer
+}
+
+
 function textToBuffer( str ) {
     const uint8Array = encoder.encode( str )
     const buffer = uint8Array.buffer
@@ -28,4 +35,4 @@ function bufferToText( buffer ) {
 }
 
 
-export { xyToIndex, indexToXY, textToBuffer, bufferToText }
+export { xyToIndex, indexToXY, textToBuffer, bufferToText, objectToBuffer }
