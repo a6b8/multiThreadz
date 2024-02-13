@@ -1,31 +1,48 @@
 import { config } from './data/config.mjs'
-import { Workers } from './Workers/Workers2.mjs'
+import { Workers } from './Workers/Workers.mjs'
 
 import { objectToBuffer } from './helpers/mixed.mjs'
 
 
 export class MultiThreadz {
+    #config
     #workers
+    #queue
 
 
-    constructor() {
+    constructor( { threads, workerPath }) {
+        this.#config = config
         this.#workers = new Workers( { 
-            'workers': config['workers']
+            threads, workerPath
         } )
+
+        this.#queue = this.#addQueue()
 
         return true
     }
 
 
-    addData( { chunks } ) {
-        const transformedChunks = chunks
-            .map( chunk => {
-                const buffer = objectToBuffer( { 'obj': chunk } )
-                const result = { thread, buffer }
-                return result
+    setData( { data } ) {
+        data
+            .forEach( ( chunk, index ) => {
+                const result = {
+                    'marker': null,
+                    'buffer': null
+                }
+
+                if( chunk?.marker ) {
+                    result['marker'] = chunk['marker']
+                    delete chunk['marker']
+                } else {
+                    result['marker'] = this.#config['queue']['defaultMarker']
+                }
+
+                result['buffer'] = objectToBuffer( { 'obj': chunk } )
+                this.#queue['pending'].push( result )
+                return true
             } )
 
-        return true
+        return this
     }
 
 
@@ -36,5 +53,15 @@ export class MultiThreadz {
 
     health() {
         return true
+    }
+
+
+    #addQueue() {
+        const result = {
+            'pending': [],
+            'done': []
+        }
+
+        return result
     }
 }

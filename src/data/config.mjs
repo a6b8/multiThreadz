@@ -1,12 +1,8 @@
 export const config = {
-    'workers': {
-        'threads': 1,
-        'maxChunkSize': 8,
-        'templates': {
-            'standard': './src/Workers/worker.mjs'
-        }
+    'queue': {
+        'defaultMarker': 'default',
     },
-    'example': {
-        'length': 50
+    'workers': {
+        'maxChunkSize': 8
     }
 }

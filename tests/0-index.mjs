@@ -2,48 +2,41 @@ import { MultiThreadz } from '../src/MultiThreadz.mjs'
 import { config } from '../src/data/config.mjs'
 
 
-function getExampleData() {
-    const data = new Array( config['example']['length'] )
+function getExampleData( { size, markers } ) {
+    const data = new Array( size )
         .fill( '' )
         .map( ( a, index ) => {
+            const randomIndex = Math.floor( Math.random() * markers.length )
             const result = {
-                'workerId': index % config['workers']['threads'],
+                'marker': markers[ randomIndex ]['marker'],
                 'time': Math.floor( Math.random() * ( 2000 - 500 + 1 ) ) + 500
             }
             return result
         } )
 
-    const byWorker = data.reduce( ( acc, cur ) => {
-        if( !acc[ cur['workerId'] ] ) {
-            acc[ cur['workerId'] ] = []
-        }
-        acc[ cur['workerId'] ].push( cur )
-        return acc
-    }, {} )
-
-    const chunkSize = config['workers']['maxChunkSize']
-    const chunks = Object
-        .keys( byWorker )
-        .map( ( workerId ) => {
-            const chunk = byWorker[ workerId ]
-                .reduce( ( acc, cur, index ) => {
-                    const chunkIndex = Math.floor( index / chunkSize )
-                    if( !acc[ chunkIndex ] ) {
-                        acc[ chunkIndex ] = []
-                    }
-
-                    acc[ chunkIndex ].push( cur )
-                    return acc
-                }, [] )
-            return chunk
-        } )
-
-    return { data, chunks }
+    return { data }
 }
 
 
 
-const multiThreadz = new MultiThreadz()
 
-await multiThreadz.start()
-// await multiCall.start()
+const markers = [ 
+    {
+        'marker': 'abc'
+    },
+    {
+        'marker': 'test'
+    },
+    {
+        'marker': 123
+    }
+]
+
+const mt = new MultiThreadz( { 
+    'threads': 2,
+    'workerPath': './src/Workers/worker.mjs'
+} )
+
+const { data } = getExampleData( { 'size': 100, markers } )
+mt.setData( { data } )
+mt.start()
