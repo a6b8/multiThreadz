@@ -33,10 +33,12 @@ export class MultiThreadz {
 
 
     setData( { data, constraints={} } ) {
+        const unixTimestamp = Math.floor(Date.now() / 1000)
         let r = data
             .map( ( item, index ) => {
                 const name = item?.marker ? item['marker'] : this.#config['queue']['default']['markerName']
                 const result = {
+                    'id': `${unixTimestamp}-${index}`,
                     'marker': {
                         'index': null,
                         name
@@ -47,7 +49,7 @@ export class MultiThreadz {
                 return result
             } )
 
-        const constraints = Object
+        const _constraints = Object
             .entries(
                 r
                     .reduce( ( acc, a ) => {
@@ -81,57 +83,15 @@ export class MultiThreadz {
                 return acc  
             }, {} )
 
-
-        console.log( 'r', allCurrentMarkers )
-        process.exit( 1 )
-
-        this.setConstraints( { constraints } )
-
-/*
-        const results = data
+        this.setConstraints( { 'constraints': _constraints } )
+        const results = r
             .map( ( item, index ) => {
-                const result = {
-                    // 'marker': null,
-                    'markerIndex': null,
-                    // 'buffer': null
-                    'data': null
-                }
-
-                const markerIndex = this.#state['constraints']['order'] 
-                    .findIndex( ( a ) => a === item['marker'] ) 
-                
-                if( markerIndex !== -1 ) {
-                   result['markerIndex'] = markerIndex 
-                } else {
-                    result['markerIndex'] = this.#state['constraints']['order'].length -1 
-                }
-
-                result['data'] = item
-
-                return result
+                item['marker']['index'] = this.#state['constraints']['shared']['order'] 
+                    .findIndex( ( a ) => a === item['marker']['name'] ) 
+                delete item['data']['marker']
+                return item
             } )
-*/
-
-        const constraintsInUse = data
-            .reduce( ( acc, a, index, all ) => {
-                acc.add( a['marker'] )
-                if( all.length -1 === index ) {
-                    acc =  Array.from( acc )
-                }
-                return acc
-            }, new Set() )
-            .map( ( name ) => {
-                const result = {
-                    name,
-                }
-
-                console.log( constraints )
-
-                return result
-            } )
-
-        console.log( '>>', constraintsInUse )
-
+ 
         this.#queue['pending'].push( ...results )
 
         return this
@@ -139,25 +99,30 @@ export class MultiThreadz {
 
 
     setConstraints( { constraints } ) {
-        if( constraints?.default ) {
-            console.log( 'Key "default" can not set.' )
-            process.exit( 1 )
-        }
-
-
-        constraints['default'] = this.#config['workers']['maxConstraints']
         this.#state['constraints'] = {
-            'order': Object.keys( constraints ),
-            'shared': null,
+            'byMarker': {},
+            'shared': {
+                'order': Object.keys( constraints ),
+                'buffer': null
+            }
         }
+
+        this.#state['constraints']['byMarker'] = Object
+            .entries( constraints )
+            .reduce( ( acc, a, index ) => {
+                acc[ a[ 0 ] ] = a[ 1 ]
+                acc[ a[ 0 ] ]['index'] = this.#state['constraints']['shared']['order'] 
+                    .findIndex( ( b ) => b === a[ 0 ] ) 
+                return acc
+            }, {} )
 
         const values = Object.values( constraints )
         const sab = new SharedArrayBuffer( values.length * Int32Array.BYTES_PER_ELEMENT )
-        this.#state['constraints']['shared'] = new Int32Array( sab )
+        this.#state['constraints']['shared']['buffer'] = new Int32Array( sab )
 
         values
             .forEach( ( value, index ) => { 
-                this.#state['constraints']['shared'][ index ] = 0
+                this.#state['constraints']['shared']['buffer'][ index ] = 0
             } )
 
         return true
@@ -168,7 +133,7 @@ export class MultiThreadz {
         this.#workers = new Workers( { 
             'threads': this.#state['threads'],
             'workerPath': this.#state['workerPath'],
-            'constraints': this.#state['constraints']['shared'],
+            'constraints': this.#state['constraints']['shared']['buffer'],
             'nonce': this.#state['nonce']
         } )
 
@@ -204,14 +169,39 @@ export class MultiThreadz {
 
 
     #getChunk() {
+         let status = true
 
-        console.log( '>', this.#state)
-process.exit( 1 )
-        const chunk = this.#queue['pending'].slice( 0, 8 )
+        if( this.#queue['pending'].length === 0 ) {
+            status = false
+        }
+
+        const chunk = Object
+            .entries( this.#state['constraints']['byMarker'] )
+            .sort( ( a, b ) => a[ 1 ]['maxConcurrentProcesses'] - b[ 1 ]['maxConcurrentProcesses'] )
+            .reduce( ( acc, a, index ) => {
+                const [ key, value ] = a
+                const currentProcesses = Atomics.load( this.#state['constraints']['shared']['buffer'], value['index'] )
+                const maxProcesses = value['maxConcurrentProcesses']
+                const delta = maxProcesses - currentProcesses
+
+                const findings = this.#queue['pending']
+                    .filter( ( b ) => b['marker']['index'] === value['index'] )
+                    .filter( ( b, index ) => index < delta )
+                    .forEach( ( item ) => {
+                        if( acc.length < this.#config['workers']['maxChunkSize'] ) {
+                            acc.push( item )
+                            const index = this.#queue['pending']
+                                .findIndex( c => c['id'] === item['id'] )
+                            this.#queue['pending'].splice( index, 1 )
+                            this.#queue['done'].push( item)   
+                        }
+                    } )
+
+                return acc
+            }, [] )
+
         this.#queue['done'].push( ...chunk )
         const buffer = objectToBuffer( { 'obj': chunk } )
-
-        console.log( '>', this.#queue['done'] )
         return { buffer }
     }
 }

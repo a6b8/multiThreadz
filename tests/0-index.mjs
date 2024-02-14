@@ -33,7 +33,7 @@ const markers = [
 ]
 
 const mt = new MultiThreadz( { 
-    'threads': 2,
+    'threads': 20,
     'workerPath': './src/Workers/worker.mjs'
 } )
 

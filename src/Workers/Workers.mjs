@@ -8,7 +8,7 @@ export class Workers {
 
     constructor( { threads, workerPath, constraints, nonce } ) {
         this.#config = { threads, workerPath, constraints, nonce }
-        console.log( '>>>', this.#config)
+        // console.log( '>>>', this.#config )
         this.#workers = this.#addWorkers()
 
         return true

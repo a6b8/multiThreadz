@@ -22,15 +22,16 @@ parentPort.once(
                 .map( async( item, index ) => {
                     Atomics.add(
                         workerData['constraints'], 
-                        item['markerIndex'], 
+                        item['marker']['index'], 
                         1
                     )
+
                     await delayedPromise( item.data.time )
                     const { markerIndex } = item
 
                     Atomics.sub(
                         workerData['constraints'], 
-                        item['markerIndex'], 
+                        item['marker']['index'], 
                         1
                     )
 
@@ -40,8 +41,8 @@ parentPort.once(
                         1
                     )
 
-                    //console.log( 'Index', index, 'done')
-                    console.log( 'w', workerData )
+                    // console.log( 'Index', index, 'done')
+                     console.log( 'w', workerData )
                     return true
                 } )
         )
@@ -52,6 +53,3 @@ parentPort.once(
 
     } 
 )
-
-
-console.log( 'INIT')
