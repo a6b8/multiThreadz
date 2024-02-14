@@ -18,17 +18,17 @@ function getExampleData( { size, markers } ) {
 }
 
 
-
-
 const markers = [ 
     {
-        'marker': 'abc'
+        'marker': 'abc',
+        'contraint': 23,
     },
     {
-        'marker': 'test'
+        'marker': 'test',
+        'contraint': 3,
     },
     {
-        'marker': 123
+        'marker': '123'
     }
 ]
 
@@ -37,6 +37,15 @@ const mt = new MultiThreadz( {
     'workerPath': './src/Workers/worker.mjs'
 } )
 
-const { data } = getExampleData( { 'size': 100, markers } )
-mt.setData( { data } )
-mt.start()
+const constraints = markers
+    .reduce( ( acc, a, index ) => {
+        a?.contraint ? acc[ a['marker'] ] = a['contraint'] : ''
+        return acc
+    }, {} )
+
+// mt.setConstraints( { constraints } )
+
+const { data } = getExampleData( { 'size': 200, markers } )
+mt.setData( { data, constraints } )
+
+await mt.start()

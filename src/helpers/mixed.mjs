@@ -1,6 +1,3 @@
-const encoder = new TextEncoder()
-
-
 function xyToIndex( { x, y, cols } ) {
     return x * cols + y
 }
@@ -22,6 +19,7 @@ function objectToBuffer( { obj } ) {
 
 
 function textToBuffer( str ) {
+    const encoder = new TextEncoder()
     const uint8Array = encoder.encode( str )
     const buffer = uint8Array.buffer
     return buffer
@@ -30,7 +28,8 @@ function textToBuffer( str ) {
 
 function bufferToText( buffer ) {
     const uint8Array = new Uint8Array( buffer )
-    const str = encoder.decode( uint8Array )
+    const decoder = new TextDecoder();
+    const str = decoder.decode( uint8Array )
     return str
 }
 

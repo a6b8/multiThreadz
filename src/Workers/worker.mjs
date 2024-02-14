@@ -1,37 +1,57 @@
 import { parentPort, workerData } from 'worker_threads'
-import { xyToIndex, indexToXY } from '../helpers/mixed.mjs' 
+import { xyToIndex, indexToXY, bufferToText } from '../helpers/mixed.mjs' 
 
 
-// console.log( 'INSIDE', workerData )
-// console.log( workerData['sharedData'] )
-
-
-
-
+function delayedPromise( time ) {
+    return new Promise( ( resolve ) => {
+      setTimeout(() => {
+        resolve( true );
+      }, time );
+    } )
+}
 
 
 parentPort.once(
     'message', 
-    async ( chunk ) => {
-        const result = await Promise.all(
-            chunk.map( async ( item, col ) => {
-                // row * cols + col
-                const thread = workerData.thread
-                const index = workerData.row * chunk.length + col
-                workerData['sharedData'][ index ] = 1
-console.log( workerData['sharedData'] )
-                return new Promise( ( resolve ) => {
-                    setTimeout( () => {
-                        workerData['sharedData'][ index ] = 2
-                        //console.log( `${rindex}`)
-                        resolve( item )
-                    }, item['time'] )
+    async( buffer ) => {
+        const txt = bufferToText( buffer )
+        const data = JSON.parse( txt )
+
+        const test = await Promise.all(
+            data
+                .map( async( item, index ) => {
+                    Atomics.add(
+                        workerData['constraints'], 
+                        item['markerIndex'], 
+                        1
+                    )
+                    await delayedPromise( item.data.time )
+                    const { markerIndex } = item
+
+                    Atomics.sub(
+                        workerData['constraints'], 
+                        item['markerIndex'], 
+                        1
+                    )
+
+                    Atomics.add(
+                        workerData['nonce'],
+                        0,
+                        1
+                    )
+
+                    //console.log( 'Index', index, 'done')
+                    console.log( 'w', workerData )
+                    return true
                 } )
-            } )
         )
 
-        parentPort.postMessage(
-            `Worker ${JSON.stringify( workerData ) } finished processing all commands. Result is ${JSON.stringify( result )}    `
-        )
+        console.log( 'Worker done' )
+        // Once the task is complete, send a response back to the main thread
+        parentPort.postMessage('Message received by worker');
+
     } 
 )
+
+
+console.log( 'INIT')

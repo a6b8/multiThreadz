@@ -1,8 +1,11 @@
 export const config = {
     'queue': {
-        'defaultMarker': 'default',
+        'default': {
+            'markerName': 'default', 
+            'maxConcurrentProcessesByMarker': 999
+        }
     },
     'workers': {
-        'maxChunkSize': 8
+        'maxChunkSize': 8,
     }
 }
