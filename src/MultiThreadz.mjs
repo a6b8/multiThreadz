@@ -25,9 +25,9 @@ export class MultiThreadz {
         }
         this.#printConsole = new PrintConsole()
 
-        const buffer = new SharedArrayBuffer( 1 )
-        const sharedUint8Array = new Uint8Array( buffer )
-        this.#state['nonce'] = sharedUint8Array
+        const buffer = new SharedArrayBuffer( 1*4 )
+        const sharedUint32Array = new Uint32Array( buffer )
+        this.#state['nonce'] = sharedUint32Array
         this.#state['nonce'][ 0 ] = 0
 
         this.#queue = this.#addQueue()
@@ -87,7 +87,7 @@ export class MultiThreadz {
                 return acc  
             }, {} )
 
-        this.setConstraints( { 'constraints': _constraints } )
+        this.#setConstraints( { 'constraints': _constraints } )
         const results = r
             .map( ( item, index ) => {
                 item['marker']['index'] = this.#state['constraints']['shared']['order'] 
@@ -101,7 +101,7 @@ export class MultiThreadz {
     }
 
 
-    setConstraints( { constraints } ) {
+    #setConstraints( { constraints } ) {
         this.#state['constraints'] = {
             'byMarker': {},
             'shared': {
@@ -140,6 +140,25 @@ export class MultiThreadz {
             'nonce': this.#state['nonce']
         } )
 
+        const markersTotal = Object
+            .entries( this.#queue['pending'] )
+            .reduce( ( acc, a, index ) => {
+                const [ key, value ] = a
+                if( !Object.hasOwn( acc, value['marker']['name'] ) ) { 
+                    acc[ value['marker']['name'] ] = 0
+                }
+                acc[ value['marker']['name']]++ 
+                return acc
+            }, {} )
+
+        this.#printConsole.init( {
+            'nonce': this.#state['nonce'],
+            'buffer': this.#state['constraints']['shared']['buffer'],
+            'threads': this.#state['threads'],
+            markersTotal
+
+        } )
+
         const test = await Promise.all(
             new Array( this.#state['threads'] )
                 .fill( '' )
@@ -154,9 +173,19 @@ export class MultiThreadz {
 
 
     async #callTask( { thread, row=0 } ) {
-        console.log( `New task ${thread} ${row} A ${this.#queue['pending'].length} ${this.#state['constraints']['shared']['buffer']}` )
+        // console.log( `New task ${thread} ${row} A ${this.#queue['pending'].length} ${this.#state['constraints']['shared']['buffer']}` )
         // console.log( this.#queue['pending'].length)
         const { types, status, buffer } = this.#getChunk()
+
+        this.#printConsole.updateState( { 
+            thread, 
+            row, 
+            chunkLength: buffer.length,
+            types
+        } )
+
+        this.#printConsole.printState()
+
         // console.log( `New task ${thread} ${row} B` )
         if( status === true ) {
             // console.log( `New task ${thread} ${row} C` )

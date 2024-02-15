@@ -1,19 +1,17 @@
 import { MultiThreadz } from '../src/MultiThreadz.mjs'
-import { config } from '../src/data/config.mjs'
-
 import { getExampleData } from '../src/helpers/mixed.mjs'
  
 
 const mt = new MultiThreadz( { 
-    'threads': 1,
+    'threads': 6,
     'workerPath': './src/Workers/worker.mjs'
 } )
 
 const { data } = getExampleData( { 
-    'size': 20, 
+    'size': 200000, 
     'markers': [ 'abc', 'test', 'unknown' ], 
-    min: 10, 
-    max: 100 
+    'min': 10, 
+    'max': 100 
 } )
 
 mt.setData( { 
@@ -25,4 +23,5 @@ mt.setData( {
 } )
 
 await mt.start()
-console.log( 'FINISHED')
+console.log()
+console.log( 'FINISHED' )  

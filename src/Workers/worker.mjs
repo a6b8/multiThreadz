@@ -21,6 +21,12 @@ parentPort.once(
             data
                 .map( async( item, index ) => {
                     Atomics.add(
+                        workerData['nonce'],
+                        0,
+                        1
+                    )
+ 
+                    Atomics.add(
                         workerData['constraints'], 
                         item['marker']['index'], 
                         1
@@ -35,21 +41,9 @@ parentPort.once(
                         1
                     )
 
-                    Atomics.add(
-                        workerData['nonce'],
-                        0,
-                        1
-                    )
-
-                    // console.log( 'Index', index, 'done')
-                    // console.log( 'w', workerData )
                     return true
                 } )
         )
-
-        // console.log( 'Worker done' )
-        // Once the task is complete, send a response back to the main thread
-        parentPort.postMessage('Message received by worker');
-
+        parentPort.postMessage( 'Message received by worker' )
     } 
 )
