@@ -1,51 +1,28 @@
 import { MultiThreadz } from '../src/MultiThreadz.mjs'
 import { config } from '../src/data/config.mjs'
 
-
-function getExampleData( { size, markers } ) {
-    const data = new Array( size )
-        .fill( '' )
-        .map( ( a, index ) => {
-            const randomIndex = Math.floor( Math.random() * markers.length )
-            const result = {
-                'marker': markers[ randomIndex ]['marker'],
-                'time': Math.floor( Math.random() * ( 2000 - 500 + 1 ) ) + 500
-            }
-            return result
-        } )
-
-    return { data }
-}
-
-
-const markers = [ 
-    {
-        'marker': 'abc',
-        'contraint': 23,
-    },
-    {
-        'marker': 'test',
-        'contraint': 3,
-    },
-    {
-        'marker': '123'
-    }
-]
+import { getExampleData } from '../src/helpers/mixed.mjs'
+ 
 
 const mt = new MultiThreadz( { 
-    'threads': 20,
+    'threads': 1,
     'workerPath': './src/Workers/worker.mjs'
 } )
 
-const constraints = markers
-    .reduce( ( acc, a, index ) => {
-        a?.contraint ? acc[ a['marker'] ] = a['contraint'] : ''
-        return acc
-    }, {} )
+const { data } = getExampleData( { 
+    'size': 20, 
+    'markers': [ 'abc', 'test', 'unknown' ], 
+    min: 10, 
+    max: 100 
+} )
 
-// mt.setConstraints( { constraints } )
-
-const { data } = getExampleData( { 'size': 200, markers } )
-mt.setData( { data, constraints } )
+mt.setData( { 
+    data, 
+    'constraints': {
+        'abc': 23,
+        'test': 10
+    } 
+} )
 
 await mt.start()
+console.log( 'FINISHED')

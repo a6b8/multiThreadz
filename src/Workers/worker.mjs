@@ -42,12 +42,12 @@ parentPort.once(
                     )
 
                     // console.log( 'Index', index, 'done')
-                     console.log( 'w', workerData )
+                    // console.log( 'w', workerData )
                     return true
                 } )
         )
 
-        console.log( 'Worker done' )
+        // console.log( 'Worker done' )
         // Once the task is complete, send a response back to the main thread
         parentPort.postMessage('Message received by worker');
 

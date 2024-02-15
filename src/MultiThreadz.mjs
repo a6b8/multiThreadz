@@ -1,5 +1,6 @@
 import { config } from './data/config.mjs'
-import { Workers } from './Workers/Workers.mjs'
+import { Workers } from './workers/Workers.mjs'
+import { PrintConsole } from './console/PrintConsole.mjs'
 
 import { objectToBuffer } from './helpers/mixed.mjs'
 
@@ -11,6 +12,8 @@ export class MultiThreadz {
     #queue
     #state
 
+    #printConsole
+
 
     constructor( { threads, workerPath } ) {
         this.#config = config
@@ -20,6 +23,7 @@ export class MultiThreadz {
             'constraints': {},
             'nonce': null
         }
+        this.#printConsole = new PrintConsole()
 
         const buffer = new SharedArrayBuffer( 1 )
         const sharedUint8Array = new Uint8Array( buffer )
@@ -89,12 +93,11 @@ export class MultiThreadz {
                 item['marker']['index'] = this.#state['constraints']['shared']['order'] 
                     .findIndex( ( a ) => a === item['marker']['name'] ) 
                 delete item['data']['marker']
+                this.#queue['pending'].push( item )
                 return item
             } )
  
-        this.#queue['pending'].push( ...results )
-
-        return this
+        return true
     }
 
 
@@ -140,14 +143,34 @@ export class MultiThreadz {
         const test = await Promise.all(
             new Array( this.#state['threads'] )
                 .fill( '' )
-                .map( async( a, index ) => {
-                    const { buffer } = this.#getChunk()
-                    await this.#workers.start( { 
-                        'thread': index, 
-                        buffer
-                    } )
+                .map( async( a, thread ) => {
+                    await this.#callTask( { thread } )
+                    return true
                 } )
         )
+
+        return true
+    }
+
+
+    async #callTask( { thread, row=0 } ) {
+        console.log( `New task ${thread} ${row} A ${this.#queue['pending'].length} ${this.#state['constraints']['shared']['buffer']}` )
+        // console.log( this.#queue['pending'].length)
+        const { types, status, buffer } = this.#getChunk()
+        // console.log( `New task ${thread} ${row} B` )
+        if( status === true ) {
+            // console.log( `New task ${thread} ${row} C` )
+            await this.#workers.start( { 
+                thread, 
+                buffer
+            } )
+            // console.log( `New task ${thread} ${row} D` )
+            row++
+            await this.#callTask( { thread, row } ) 
+            // console.log( `New task ${thread} ${row} E` )
+        } else {
+            // console.log( `New task ${thread} ${row} F` )
+        }
 
         return true
     }
@@ -170,12 +193,13 @@ export class MultiThreadz {
 
     #getChunk() {
          let status = true
+         const types = {}
 
         if( this.#queue['pending'].length === 0 ) {
             status = false
         }
 
-        const chunk = Object
+        const buffer = Object
             .entries( this.#state['constraints']['byMarker'] )
             .sort( ( a, b ) => a[ 1 ]['maxConcurrentProcesses'] - b[ 1 ]['maxConcurrentProcesses'] )
             .reduce( ( acc, a, index ) => {
@@ -184,7 +208,7 @@ export class MultiThreadz {
                 const maxProcesses = value['maxConcurrentProcesses']
                 const delta = maxProcesses - currentProcesses
 
-                const findings = this.#queue['pending']
+                const tmp = this.#queue['pending']
                     .filter( ( b ) => b['marker']['index'] === value['index'] )
                     .filter( ( b, index ) => index < delta )
                     .forEach( ( item ) => {
@@ -192,6 +216,12 @@ export class MultiThreadz {
                             acc.push( item )
                             const index = this.#queue['pending']
                                 .findIndex( c => c['id'] === item['id'] )
+
+                            if( !Object.hasOwn( types, item['marker']['name'] ) ) {
+                                types[ item['marker']['name'] ] = 0
+                            }
+                            types[ item['marker']['name'] ]++
+
                             this.#queue['pending'].splice( index, 1 )
                             this.#queue['done'].push( item)   
                         }
@@ -199,9 +229,23 @@ export class MultiThreadz {
 
                 return acc
             }, [] )
+            .reduce( ( acc, a, index, all ) => {
+                acc.push( a )
+                if( all.length - 1 === index ) {
+                    if( acc.length === 0 ) {
+                        status = false
+                    } else {
+                        acc = objectToBuffer( { 'obj': acc } )
+                    }
+                }
 
-        this.#queue['done'].push( ...chunk )
-        const buffer = objectToBuffer( { 'obj': chunk } )
-        return { buffer }
+                return acc
+            }, [] )
+        // console.log( '>>>', types )
+        if( !(buffer instanceof ArrayBuffer) ) {
+            status = false
+        }
+        
+        return { types, status, buffer }
     }
 }

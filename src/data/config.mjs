@@ -6,6 +6,6 @@ export const config = {
         }
     },
     'workers': {
-        'maxChunkSize': 8,
+        'maxChunkSize': 10,
     }
 }

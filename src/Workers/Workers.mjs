@@ -17,11 +17,22 @@ export class Workers {
 
     async start( { thread, buffer } ) {
         return new Promise( ( resolve, reject ) => {
-            const worker = this.#workers[ thread ]
+            // const worker = this.#workers[ thread ]
+            const worker = new Worker( 
+                this.#config['workerPath'],
+                { 
+                    'workerData': { 
+                        'constraints': this.#config['constraints'],
+                        'nonce': this.#config['nonce']                        
+                    } 
+                }
+            )
+
             worker.on( 
                 'message', 
                 ( msg ) => {
-                    console.log('Received data from worker:', msg)
+                    // console.log( 'Received data from worker:', msg )
+                    worker.terminate()
                     resolve( true )
                 }
             )
