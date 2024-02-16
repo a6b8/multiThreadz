@@ -6,6 +6,23 @@ To distribute computational power as efficiently as possible across CPUs, this m
 
 > Under Construction, only for testing.
 
+## Quickstart
+
+```js
+import { MultiThreadz, getExamplePayloads } from '../src/MultiThreadz.mjs'
+ 
+const mt = new MultiThreadz( { 
+    'threads': 4,
+    'workerPath': './tests/template/worker.mjs',
+    'maxChunkSize': 42
+} )
+
+const { payloads } = getExamplePayloads({})
+mt.setPayloads( { payloads } )
+const ids = await mt.start()
+```
+
+
 ## Features:
 - Efficient workload distribution across multiple threads for optimal CPU utilization.
 - Streamlined decoding of payloads into manageable chunks for parallel processing.
@@ -16,6 +33,7 @@ To distribute computational power as efficiently as possible across CPUs, this m
 
 ## Table of Contents
 - [MultiThreadz](#multithreadz)
+  - [Quickstart](#quickstart)
   - [Features:](#features)
   - [Table of Contents](#table-of-contents)
   - [Overview](#overview)
@@ -55,7 +73,7 @@ This example creates 2 threads. Each task sent to `worker.js` carries a maximum 
 import { MultiThreadz } from '../src/MultiThreadz.mjs'
 const mt = new MultiThreadz( { 
     'threads': 2,
-    'workerPath': './src/Workers/worker.mjs',
+    'workerPath': './tests/template/worker.mjs',
     'maxChunkSize': 20
 } )
 ```
@@ -91,24 +109,20 @@ This example passes 2 payloads including the optional `marker` key. `constraints
 
 ```js
 mt.setPayloads( { 
-  'payloads': [
-    {
-      'marker': 'abc',
-      'time': 233
-    },
-    {
-      'marker': 'test',
-      'time': 223
-    }
-  ], 
-  'constraints'={
-    'abc': {
-      'maxConcurrentProcesses': 3
-    },
-    'test': {
-      'maxConcurrentProcesses': 2
-    }
-  } 
+    'payloads': [
+        {
+            'marker': 'abc',
+            'time': 233
+        },
+        {
+            'marker': 'test',
+            'time': 223
+        }
+    ], 
+    'constraints': {
+        'abc': 3,
+        'test': 2
+    } 
 } )
 
 ```
@@ -149,7 +163,7 @@ import { MultiThreadz, getExamplePayloads } from '../src/MultiThreadz.mjs'
 
 const mt = new MultiThreadz( { 
     'threads': 2,
-    'workerPath': './src/Workers/worker.mjs',
+    'workerPath': './tests/template/worker.mjs',
     'maxChunkSize': 20
 } )
 

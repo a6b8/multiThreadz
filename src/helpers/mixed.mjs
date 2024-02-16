@@ -43,7 +43,7 @@ function bufferToText( buffer ) {
 }
 
 
-function getExamplePayloads( { size, markers, min, max } ) {
+function getExamplePayloads( { size=200, markers=['a', 'b' ], min=10, max=20 } ) {
     const payloads = new Array( size )
         .fill( '' )
         .map( ( a, index ) => {
