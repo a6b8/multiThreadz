@@ -6,4 +6,4 @@ jobs:
       - checkout
       - run: node --version
       - run: npm install
-      - run: node ./tests/1-encoded-payload.mjs
+      - run: node ./tests/circle-ci.mjs
