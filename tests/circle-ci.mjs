@@ -1,9 +1,12 @@
 import { MultiThreadz } from './../src/MultiThreadz.mjs'
 
+
 const mt = new MultiThreadz( { 
-    'threads': 2,
-    'workerPath': './src/Workers/worker.mjs'
+    'threads': 8,
+    'workerPath': './src/Workers/worker.mjs',
+    'maxChunkSize': 100
 } )
+
 const result = mt.health()
 
 if( result ) {

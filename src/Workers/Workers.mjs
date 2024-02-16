@@ -8,7 +8,6 @@ export class Workers {
 
     constructor( { threads, workerPath, constraints, nonce } ) {
         this.#config = { threads, workerPath, constraints, nonce }
-        // console.log( '>>>', this.#config )
         this.#workers = this.#addWorkers()
 
         return true
@@ -31,9 +30,9 @@ export class Workers {
             worker.on( 
                 'message', 
                 ( msg ) => {
-                    // console.log( 'Received data from worker:', msg )
+                    // console.log( 'Received data from worker:', msg ) 
                     worker.terminate()
-                    resolve( true )
+                    resolve( msg )
                 }
             )
 

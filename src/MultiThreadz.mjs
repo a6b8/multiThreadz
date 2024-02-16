@@ -2,10 +2,10 @@ import { config } from './data/config.mjs'
 import { Workers } from './workers/Workers.mjs'
 import { PrintConsole } from './console/PrintConsole.mjs'
 
-import { objectToBuffer } from './helpers/mixed.mjs'
+import { getExamplePayloads, buffersToBuffer, bufferToText } from './helpers/mixed.mjs'
 
 
-export class MultiThreadz {
+class MultiThreadz {
     #workers
 
     #config
@@ -15,17 +15,18 @@ export class MultiThreadz {
     #printConsole
 
 
-    constructor( { threads, workerPath } ) {
+    constructor( { threads=1, workerPath, maxChunkSize=10 } ) {
         this.#config = config
         this.#state = {
             threads, 
             workerPath,
+            maxChunkSize,
             'constraints': {},
             'nonce': null
         }
         this.#printConsole = new PrintConsole()
 
-        const buffer = new SharedArrayBuffer( 1*4 )
+        const buffer = new SharedArrayBuffer( Int32Array.BYTES_PER_ELEMENT )
         const sharedUint32Array = new Uint32Array( buffer )
         this.#state['nonce'] = sharedUint32Array
         this.#state['nonce'][ 0 ] = 0
@@ -36,44 +37,54 @@ export class MultiThreadz {
     }
 
 
-    setData( { data, constraints={} } ) {
-        const unixTimestamp = Math.floor(Date.now() / 1000)
-        let r = data
-            .map( ( item, index ) => {
+    setPayloads( { payloads, constraints={} } ) {
+        // console.log( payloads.length)
+        const unixTimestamp = Math.floor( Date.now() / 1000 )
+        const key = [ 'id', 'payloadEncoded' ]
+
+        let markerCount = 0
+
+        this.#queue['pending'] = new Map()
+        this.#queue['pending'].set( 'byMarkerLookUp', new Map() )
+        this.#queue['pending'].set( 'byMarker', new Map() )
+ 
+        payloads
+            .forEach( ( item, index ) => {
                 const name = item?.marker ? item['marker'] : this.#config['queue']['default']['markerName']
-                const result = {
-                    'id': `${unixTimestamp}-${index}`,
-                    'marker': {
-                        'index': null,
-                        name
-                    },
-                    'data': item
+                
+                if( !this.#queue['pending'].get('byMarker').has( name ) ) {
+                    this.#queue['pending']
+                        .get('byMarker')
+                        .set( name, [] )
+                    
+                    this.#queue['pending']
+                        .get('byMarkerLookUp')
+                        .set( name, markerCount )
+                    markerCount++
                 }
 
-                return result
+                item['markerIndex'] = this.#queue['pending'].get('byMarkerLookUp').get( name )
+                delete item['marker']
+                const struct = [
+                    `${unixTimestamp}-${index}`,
+                    Buffer.from( JSON.stringify( item ), 'utf-8')
+                ]
+
+                this.#queue['pending']
+                    .get( 'byMarker' )
+                    .get( name )
+                    .push( struct )
+
+                return true
             } )
 
-        const _constraints = Object
-            .entries(
-                r
-                    .reduce( ( acc, a ) => {
-                        if( !Object.hasOwn( acc, a['marker']['name'] ) ) {
-                            acc[ a['marker']['name'] ] = 0
-                        }
-                        acc[ a['marker']['name'] ]++
-                        return acc
-                    }, {} )
-            )
-            // .sort( ( a, b ) => b[ 1 ] - a[ 1 ] )
-            .map( ( a ) => {
-                const result  = {
-                    'name': a[ 0 ],
-                    'count': a[ 1 ],
-                    'maxConcurrentProcesses': null
-                }
-
-                if( constraints[ a[ 0 ] ] ) {
-                    result['maxConcurrentProcesses'] = constraints[ a[ 0 ] ]
+        const constraintsKeys = Object.keys( constraints )
+        const _constraints = [ ...this.#queue['pending'].get('byMarker').keys() ]
+            .map( ( key ) => [ key, this.#queue['pending'].get('byMarker').get( key ).length ] )
+            .map( ( [ name, count ] ) => {
+                const result  = { name, count }
+                if( constraintsKeys.includes( name )) {
+                    result['maxConcurrentProcesses'] = constraints[ name ]
                 } else {
                     result['maxConcurrentProcesses'] = this.#config['queue']['default']['maxConcurrentProcessesByMarker']
                 }
@@ -88,15 +99,47 @@ export class MultiThreadz {
             }, {} )
 
         this.#setConstraints( { 'constraints': _constraints } )
-        const results = r
-            .map( ( item, index ) => {
-                item['marker']['index'] = this.#state['constraints']['shared']['order'] 
-                    .findIndex( ( a ) => a === item['marker']['name'] ) 
-                delete item['data']['marker']
-                this.#queue['pending'].push( item )
-                return item
-            } )
- 
+
+        return true
+    }
+
+
+    async start( silent=false ) {
+        this.#workers = new Workers( { 
+            'threads': this.#state['threads'],
+            'workerPath': this.#state['workerPath'],
+            'constraints': this.#state['constraints']['shared']['buffer'],
+            'nonce': this.#state['nonce']
+        } )
+
+        const markersTotal = [ ...this.#queue['pending'].get('byMarker').keys() ]
+            .reduce( ( acc, key ) => {
+                acc[ key ] = this.#queue['pending'].get('byMarker').get( key ).length
+                return acc
+            }, {} )
+
+        this.#printConsole.init( {
+            'nonce': this.#state['nonce'],
+            'buffer': this.#state['constraints']['shared']['buffer'],
+            'threads': this.#state['threads'],
+            markersTotal,
+            silent
+        } )
+
+        const results = await Promise.all(
+            new Array( this.#state['threads'] )
+                .fill( '' )
+                .map( async( a, thread ) => {
+                    const result = await this.#callTask( { thread } )
+                    return result
+                } )
+        )
+
+        return results.flat( 1 )
+    }
+
+
+    health() {
         return true
     }
 
@@ -105,10 +148,15 @@ export class MultiThreadz {
         this.#state['constraints'] = {
             'byMarker': {},
             'shared': {
-                'order': Object.keys( constraints ),
+                'order': null,
                 'buffer': null
             }
         }
+
+        this.#state['constraints']['shared']['order'] = Array
+            .from( this.#queue['pending'].get('byMarkerLookUp') )
+            .sort( ( a, b ) => a[ 1 ] - b[ 1 ] )
+            .map( ( a ) => a[ 0 ] )
 
         this.#state['constraints']['byMarker'] = Object
             .entries( constraints )
@@ -132,81 +180,30 @@ export class MultiThreadz {
     }
 
 
-    async start() {
-        this.#workers = new Workers( { 
-            'threads': this.#state['threads'],
-            'workerPath': this.#state['workerPath'],
-            'constraints': this.#state['constraints']['shared']['buffer'],
-            'nonce': this.#state['nonce']
-        } )
-
-        const markersTotal = Object
-            .entries( this.#queue['pending'] )
-            .reduce( ( acc, a, index ) => {
-                const [ key, value ] = a
-                if( !Object.hasOwn( acc, value['marker']['name'] ) ) { 
-                    acc[ value['marker']['name'] ] = 0
-                }
-                acc[ value['marker']['name']]++ 
-                return acc
-            }, {} )
-
-        this.#printConsole.init( {
-            'nonce': this.#state['nonce'],
-            'buffer': this.#state['constraints']['shared']['buffer'],
-            'threads': this.#state['threads'],
-            markersTotal
-
-        } )
-
-        const test = await Promise.all(
-            new Array( this.#state['threads'] )
-                .fill( '' )
-                .map( async( a, thread ) => {
-                    await this.#callTask( { thread } )
-                    return true
-                } )
-        )
-
-        return true
-    }
-
-
-    async #callTask( { thread, row=0 } ) {
-        // console.log( `New task ${thread} ${row} A ${this.#queue['pending'].length} ${this.#state['constraints']['shared']['buffer']}` )
-        // console.log( this.#queue['pending'].length)
-        const { types, status, buffer } = this.#getChunk()
+    async #callTask( { thread, row=0, results=[] } ) {
+        const { types, status, buffer } = this.#getChunkEncoded()
 
         this.#printConsole.updateState( { 
             thread, 
-            row, 
-            chunkLength: buffer.length,
+            row,
             types
         } )
 
         this.#printConsole.printState()
-
-        // console.log( `New task ${thread} ${row} B` )
         if( status === true ) {
-            // console.log( `New task ${thread} ${row} C` )
-            await this.#workers.start( { 
+            const ids = await this.#workers.start( { 
                 thread, 
                 buffer
             } )
-            // console.log( `New task ${thread} ${row} D` )
+
+            results.push( ...ids )
+
             row++
-            await this.#callTask( { thread, row } ) 
-            // console.log( `New task ${thread} ${row} E` )
+            await this.#callTask( { thread, row, results } ) 
         } else {
-            // console.log( `New task ${thread} ${row} F` )
         }
 
-        return true
-    }
-
-
-    health() {
-        return true
+        return results
     }
 
 
@@ -220,61 +217,61 @@ export class MultiThreadz {
     }
 
 
-    #getChunk() {
-         let status = true
-         const types = {}
+    #getChunkEncoded() {
+        let status = true
+        const types = {}
 
-        if( this.#queue['pending'].length === 0 ) {
+        const l = [ ...this.#queue['pending'].get('byMarker').keys() ]
+            .reduce( ( acc, key ) => {
+                acc += this.#queue['pending'].get('byMarker').get( key ).length
+                return acc
+            }, 0 )
+
+        if( l === 0 ) {
             status = false
+            return { status, 'buffer': null, types }
         }
 
         const buffer = Object
             .entries( this.#state['constraints']['byMarker'] )
             .sort( ( a, b ) => a[ 1 ]['maxConcurrentProcesses'] - b[ 1 ]['maxConcurrentProcesses'] )
-            .reduce( ( acc, a, index ) => {
-                const [ key, value ] = a
-                const currentProcesses = Atomics.load( this.#state['constraints']['shared']['buffer'], value['index'] )
-                const maxProcesses = value['maxConcurrentProcesses']
-                const delta = maxProcesses - currentProcesses
-
-                const tmp = this.#queue['pending']
-                    .filter( ( b ) => b['marker']['index'] === value['index'] )
-                    .filter( ( b, index ) => index < delta )
-                    .forEach( ( item ) => {
-                        if( acc.length < this.#config['workers']['maxChunkSize'] ) {
-                            acc.push( item )
-                            const index = this.#queue['pending']
-                                .findIndex( c => c['id'] === item['id'] )
-
-                            if( !Object.hasOwn( types, item['marker']['name'] ) ) {
-                                types[ item['marker']['name'] ] = 0
-                            }
-                            types[ item['marker']['name'] ]++
-
-                            this.#queue['pending'].splice( index, 1 )
-                            this.#queue['done'].push( item)   
-                        }
-                    } )
-
-                return acc
-            }, [] )
             .reduce( ( acc, a, index, all ) => {
-                acc.push( a )
-                if( all.length - 1 === index ) {
-                    if( acc.length === 0 ) {
-                        status = false
-                    } else {
-                        acc = objectToBuffer( { 'obj': acc } )
+                const [ key, value ] = a
+                
+                if( acc.length < this.#state['maxChunkSize'] ) {
+                    let maxConstraints = value['maxConcurrentProcesses'] - this.#state['constraints']['shared']['buffer'][ value['index'] ]
+                    maxConstraints = maxConstraints < 0 ? 0 : maxConstraints
+                    const sizeLeft = this.#state['maxChunkSize'] - acc.length 
+                    let use = maxConstraints
+                    maxConstraints > sizeLeft ? use = sizeLeft : ''
+
+                    if( use > 0 ) {
+                        const item = this.#queue['pending']
+                            .get('byMarker')
+                            .get( key )
+                            .splice( 0, use )
+                        acc.push( ...item )
+
+                        if( !Object.hasOwn( types, key ) ) {
+                            types[ key ] = 0
+                        }
+                        types[ key ] += item.length
                     }
+
+                } else {
+                    status = false
+                }
+
+                if( all.length - 1 === index ) { 
+                    acc = buffersToBuffer( { 'buffers': acc } )
                 }
 
                 return acc
             }, [] )
-        // console.log( '>>>', types )
-        if( !(buffer instanceof ArrayBuffer) ) {
-            status = false
-        }
-        
-        return { types, status, buffer }
+
+        return { status, buffer, types }
     }
 }
+
+
+export { MultiThreadz, getExamplePayloads, bufferToText }

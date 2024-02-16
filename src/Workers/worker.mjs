@@ -1,49 +1,35 @@
 import { parentPort, workerData } from 'worker_threads'
-import { xyToIndex, indexToXY, bufferToText } from '../helpers/mixed.mjs' 
+import { bufferToText } from '../MultiThreadz.mjs'
 
 
 function delayedPromise( time ) {
     return new Promise( ( resolve ) => {
-      setTimeout(() => {
-        resolve( true );
-      }, time );
+        setTimeout(() => { resolve( true ) }, time )
     } )
 }
 
 
+const { constraints } = workerData
 parentPort.once(
     'message', 
     async( buffer ) => {
         const txt = bufferToText( buffer )
         const data = JSON.parse( txt )
 
-        const test = await Promise.all(
-            data
+        const ids = await Promise.all(
+            data['data']
                 .map( async( item, index ) => {
-                    Atomics.add(
-                        workerData['nonce'],
-                        0,
-                        1
-                    )
- 
-                    Atomics.add(
-                        workerData['constraints'], 
-                        item['marker']['index'], 
-                        1
-                    )
+                    const [ id, str ] = item
+                    const { markerIndex, time } = JSON.parse( str )
 
-                    await delayedPromise( item.data.time )
-                    const { markerIndex } = item
+                    Atomics.add( constraints, markerIndex, 1 )
+                    await delayedPromise( time )
+                    Atomics.sub( constraints, markerIndex, 1 )
 
-                    Atomics.sub(
-                        workerData['constraints'], 
-                        item['marker']['index'], 
-                        1
-                    )
-
-                    return true
+                    return id
                 } )
         )
-        parentPort.postMessage( 'Message received by worker' )
+
+        parentPort.postMessage( ids )
     } 
 )

@@ -4,8 +4,5 @@ export const config = {
             'markerName': 'default', 
             'maxConcurrentProcessesByMarker': 999
         }
-    },
-    'workers': {
-        'maxChunkSize': 10,
     }
 }

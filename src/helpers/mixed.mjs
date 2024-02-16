@@ -11,6 +11,15 @@ function indexToXY( { index, cols } ) {
 }
 
 
+function buffersToBuffer( { buffers } ) {
+    const obj = {
+        'data': buffers
+            .map( ( [ id, buffer ] ) => [ id, bufferToText( buffer ) ] )
+    }
+    return objectToBuffer( { obj } )
+}
+
+
 function objectToBuffer( { obj } ) {
     const str = JSON.stringify( obj )
     const buffer = textToBuffer( str )
@@ -34,9 +43,8 @@ function bufferToText( buffer ) {
 }
 
 
-function getExampleData( { size, markers, min, max } ) {
-
-    const data = new Array( size )
+function getExamplePayloads( { size, markers, min, max } ) {
+    const payloads = new Array( size )
         .fill( '' )
         .map( ( a, index ) => {
             const randomIndex = Math.floor( Math.random() * markers.length )
@@ -47,8 +55,8 @@ function getExampleData( { size, markers, min, max } ) {
             return result
         } )
 
-    return { data }
+    return { payloads }
 }
 
 
-export { xyToIndex, indexToXY, textToBuffer, bufferToText, objectToBuffer, getExampleData }
+export { xyToIndex, indexToXY, textToBuffer, bufferToText, objectToBuffer, getExamplePayloads, buffersToBuffer }
