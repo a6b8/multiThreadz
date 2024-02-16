@@ -1,4 +1,4 @@
-import { MultiThreadz } from './../src/MultiThreadz.mjs'
+import { MultiThreadz } from '../src/MultiThreadz.mjs'
 
 
 const mt = new MultiThreadz( { 
