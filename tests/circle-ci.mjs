@@ -1,9 +1,9 @@
-import { MultiThreadz } from '../src/MultiThreadz.mjs'
+import { MultiThreadz } from './../src/MultiThreadz.mjs'
 
 
 const mt = new MultiThreadz( { 
     'threads': 8,
-    'workerPath': '../src/Workers/worker.mjs',
+    'workerPath': './../src/Workers/worker.mjs',
     'maxChunkSize': 100
 } )
 
