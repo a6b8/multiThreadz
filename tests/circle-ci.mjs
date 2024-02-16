@@ -3,7 +3,7 @@ import { MultiThreadz } from './../src/MultiThreadz.mjs'
 
 const mt = new MultiThreadz( { 
     'threads': 8,
-    'workerPath': './../src/Workers/worker.mjs',
+    'workerPath': './tests/template/worker.mjs',
     'maxChunkSize': 100
 } )
 
